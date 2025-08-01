@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle, Download, ArrowRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useTransactions } from "@/hooks/useTransactions";
-import { usePlanConfigurations } from "@/hooks/usePlanConfigurations";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
+import { usePlanConfigurations } from "@/hooks/usePlanConfigurations";
+import { useTransactions } from "@/hooks/useTransactions";
+import { ArrowRight, CheckCircle, Download } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
@@ -16,24 +16,20 @@ export default function PaymentSuccess() {
   const { getPlanById } = usePlanConfigurations();
   const [transaction, setTransaction] = useState(null);
 
-  const transactionId = searchParams.get('transaction_id');
-  const planId = searchParams.get('plan_id');
+  const transactionId = searchParams.get("transaction_id");
+  const planId = searchParams.get("plan_id");
 
   useEffect(() => {
     if (transactions.length > 0 && transactionId) {
-      const foundTransaction = transactions.find(t => t.id === transactionId);
+      const foundTransaction = transactions.find((t) => t.id === transactionId);
       setTransaction(foundTransaction);
     }
   }, [transactions, transactionId]);
 
-  useEffect(() => {
-    // Force refresh user profile and plan data
-    const timer = setTimeout(() => {
-      window.location.reload();
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, []);
+  // Remove automatic refresh - let user manually refresh if needed
+  const handleRefreshData = () => {
+    window.location.reload();
+  };
 
   const plan = planId ? getPlanById(planId) : null;
 
@@ -41,20 +37,21 @@ export default function PaymentSuccess() {
     if (transaction) {
       const receiptData = {
         transactionId: transaction.id,
-        planName: plan?.name || 'Unknown Plan',
+        planName: plan?.name || "Unknown Plan",
         amount: transaction.amount,
         currency: transaction.currency,
         date: new Date(transaction.created_at).toLocaleDateString(),
-        status: transaction.status
+        status: transaction.status,
       };
-      
+
       const dataStr = JSON.stringify(receiptData, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      const dataUri =
+        "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
       const exportFileDefaultName = `receipt-${transaction.id}.json`;
-      
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
+
+      const linkElement = document.createElement("a");
+      linkElement.setAttribute("href", dataUri);
+      linkElement.setAttribute("download", exportFileDefaultName);
       linkElement.click();
     }
   };
@@ -66,7 +63,9 @@ export default function PaymentSuccess() {
           <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
             <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
-          <CardTitle className="text-2xl text-foreground">Payment Successful!</CardTitle>
+          <CardTitle className="text-2xl text-foreground">
+            Payment Successful!
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {transaction && plan ? (
@@ -74,7 +73,9 @@ export default function PaymentSuccess() {
               <div className="p-4 bg-muted rounded-lg">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-muted-foreground">Plan</span>
-                  <span className="font-medium text-foreground">{plan.name}</span>
+                  <span className="font-medium text-foreground">
+                    {plan.name}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-muted-foreground">Amount</span>
@@ -87,7 +88,9 @@ export default function PaymentSuccess() {
                   <Badge variant="default">{transaction.status}</Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Transaction ID</span>
+                  <span className="text-sm text-muted-foreground">
+                    Transaction ID
+                  </span>
                   <span className="text-xs font-mono text-foreground">
                     {transaction.id.slice(0, 8)}...
                   </span>
@@ -106,20 +109,27 @@ export default function PaymentSuccess() {
           ) : (
             <div className="text-center py-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-              <p className="text-sm text-muted-foreground">Loading transaction details...</p>
+              <p className="text-sm text-muted-foreground">
+                Loading transaction details...
+              </p>
             </div>
           )}
 
           <div className="space-y-2">
-            <Button
-              onClick={() => navigate('/dashboard')}
-              className="w-full"
-            >
+            <Button onClick={() => navigate("/dashboard")} className="w-full">
               Go to Dashboard
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
+            <Button
+              onClick={handleRefreshData}
+              variant="outline"
+              className="w-full"
+            >
+              Refresh Plan Status
+            </Button>
             <p className="text-xs text-center text-muted-foreground">
-              Your plan will be activated automatically. Refreshing in 3 seconds...
+              Your plan has been activated. Click refresh if your dashboard
+              doesn't show the updated plan.
             </p>
           </div>
         </CardContent>

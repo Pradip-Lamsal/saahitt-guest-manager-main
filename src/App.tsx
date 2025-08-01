@@ -8,6 +8,7 @@ import Checkout from "./pages/Checkout";
 import Contact from "./pages/Contact";
 import Dashboard from "./pages/Dashboard";
 import EmailSupport from "./pages/EmailSupport";
+import EmailVerification from "./pages/EmailVerification";
 import FAQPage from "./pages/FAQPage";
 import Help from "./pages/Help";
 import GuestCategoriesArticle from "./pages/help/GuestCategoriesArticle";
@@ -16,6 +17,7 @@ import PrintListsArticle from "./pages/help/PrintListsArticle";
 import TrackRSVPsArticle from "./pages/help/TrackRSVPsArticle";
 import UpgradePlanArticle from "./pages/help/UpgradePlanArticle";
 import Index from "./pages/Index";
+import MFASetupPage from "./pages/MFASetup";
 import NotFound from "./pages/NotFound";
 import PaymentLoading from "./pages/PaymentLoading";
 import PaymentSuccess from "./pages/PaymentSuccess";
@@ -52,6 +54,15 @@ const App = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
+        <Route path="/email-verification" element={<EmailVerification />} />
+        <Route
+          path="/mfa-setup"
+          element={
+            <ProtectedRoute>
+              <MFASetupPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
