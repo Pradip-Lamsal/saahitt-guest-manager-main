@@ -84,12 +84,99 @@ export const MFASetup = ({
   const setupTOTP = async () => {
     setLoading(true);
     try {
+      // Check if user is authenticated
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.user) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in again to set up MFA.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check existing factors first
+      const { data: factorsData, error: factorsError } =
+        await supabase.auth.mfa.listFactors();
+
+      if (factorsError) {
+        toast({
+          title: "MFA Check Failed",
+          description:
+            "Unable to check existing MFA factors. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if user already has a verified TOTP factor
+      if (factorsData?.all) {
+        const verifiedTOTPFactors = factorsData.all.filter(
+          (factor) =>
+            factor.factor_type === "totp" && factor.status === "verified"
+        );
+
+        if (verifiedTOTPFactors.length > 0) {
+          toast({
+            title: "MFA Already Set Up",
+            description: "You already have MFA configured and verified.",
+          });
+          await loadMFAFactors();
+          onComplete?.();
+          return;
+        }
+
+        // Clean up any unverified factors to avoid conflicts
+        const unverifiedFactors = factorsData.all.filter(
+          (factor) =>
+            factor.factor_type === "totp" && factor.status === "unverified"
+        );
+
+        for (const factor of unverifiedFactors) {
+          try {
+            await supabase.auth.mfa.unenroll({ factorId: factor.id });
+          } catch (err) {
+            console.log("Could not remove incomplete factor:", err);
+          }
+        }
+      }
+
+      // Create new TOTP factor
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: "totp",
         friendlyName: "Authenticator App",
       });
 
-      if (error) throw error;
+      if (error) {
+        // Handle specific error cases
+        if (
+          error.message.includes("MFA enrollment is disabled") ||
+          error.message.includes("MFA is not enabled")
+        ) {
+          toast({
+            title: "MFA Configuration Issue",
+            description:
+              "MFA needs to be enabled in your Supabase project settings first.",
+            variant: "destructive",
+          });
+        } else if (
+          error.message.includes("upgrade") ||
+          error.message.includes("plan")
+        ) {
+          toast({
+            title: "Upgrade Required",
+            description: "MFA requires a Supabase Pro plan or higher.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "MFA Setup Error",
+            description: `Failed to set up MFA: ${error.message}`,
+            variant: "destructive",
+          });
+        }
+        return;
+      }
 
       if (data) {
         setCurrentFactor({
@@ -105,15 +192,15 @@ export const MFASetup = ({
         }
 
         setStep("verify");
+        toast({
+          title: "MFA Setup Started",
+          description: "Scan the QR code with your authenticator app.",
+        });
       }
     } catch (error) {
-      console.error("TOTP setup error:", error);
       toast({
         title: "Setup Failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to setup authenticator",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -157,9 +244,18 @@ export const MFASetup = ({
 
     setLoading(true);
     try {
+      // First, we need to create a challenge for the factor
+      const { data: challengeData, error: challengeError } =
+        await supabase.auth.mfa.challenge({
+          factorId: currentFactor.id,
+        });
+
+      if (challengeError) throw challengeError;
+
+      // Then verify the challenge with the TOTP code
       const { data, error } = await supabase.auth.mfa.verify({
         factorId: currentFactor.id,
-        challengeId: "", // Will be populated by Supabase
+        challengeId: challengeData.id,
         code: verificationCode,
       });
 
@@ -284,186 +380,204 @@ export const MFASetup = ({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          Set Up Multi-Factor Authentication
-          {isOptional && <Badge variant="outline">Optional</Badge>}
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Add an extra layer of security to your account. Choose at least one
-          method.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {step === "setup" && (
-          <Tabs
-            value={activeMethod}
-            onValueChange={(value) =>
-              setActiveMethod(value as "totp" | "email")
-            }
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="totp" className="flex items-center gap-2">
-                <Smartphone className="h-4 w-4" />
-                Authenticator App
-              </TabsTrigger>
-              <TabsTrigger value="email" className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                Email OTP
-              </TabsTrigger>
-            </TabsList>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Set Up Multi-Factor Authentication
+            {isOptional && <Badge variant="outline">Optional</Badge>}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Add an extra layer of security to your account. Choose at least one
+            method.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {step === "setup" && (
+            <Tabs
+              value={activeMethod}
+              onValueChange={(value) =>
+                setActiveMethod(value as "totp" | "email")
+              }
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="totp" className="flex items-center gap-2">
+                  <Smartphone className="h-4 w-4" />
+                  Authenticator App
+                </TabsTrigger>
+                <TabsTrigger value="email" className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Email OTP
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="totp" className="space-y-4">
-              <Alert>
-                <Scan className="h-4 w-4" />
-                <AlertDescription>
-                  Use an authenticator app like Google Authenticator, Authy, or
-                  1Password to generate time-based codes.
-                </AlertDescription>
-              </Alert>
+              <TabsContent value="totp" className="space-y-4">
+                <Alert>
+                  <Scan className="h-4 w-4" />
+                  <AlertDescription>
+                    Use an authenticator app like Google Authenticator, Authy,
+                    or 1Password to generate time-based codes.
+                  </AlertDescription>
+                </Alert>
 
-              <Button onClick={setupTOTP} disabled={loading} className="w-full">
-                {loading ? "Setting up..." : "Set Up Authenticator App"}
-              </Button>
-            </TabsContent>
+                <Alert>
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Note:</strong> If you see an "MFA disabled" error,
+                    Multi-Factor Authentication needs to be enabled in your
+                    Supabase project dashboard first. Visit Authentication →
+                    Settings in your Supabase dashboard.
+                  </AlertDescription>
+                </Alert>
 
-            <TabsContent value="email" className="space-y-4">
-              <Alert>
-                <Mail className="h-4 w-4" />
-                <AlertDescription>
-                  Receive verification codes via email when signing in.
-                </AlertDescription>
-              </Alert>
+                <Button
+                  onClick={setupTOTP}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  {loading ? "Setting up..." : "Set Up Authenticator App"}
+                </Button>
+              </TabsContent>
 
-              <Button
-                onClick={setupEmailOTP}
-                disabled={loading}
-                className="w-full"
-              >
-                {loading ? "Setting up..." : "Set Up Email Verification"}
-              </Button>
-            </TabsContent>
-          </Tabs>
-        )}
+              <TabsContent value="email" className="space-y-4">
+                <Alert>
+                  <Mail className="h-4 w-4" />
+                  <AlertDescription>
+                    Receive verification codes via email when signing in.
+                  </AlertDescription>
+                </Alert>
 
-        {step === "verify" && activeMethod === "totp" && (
-          <div className="space-y-6">
-            <div className="text-center space-y-4">
-              <h3 className="font-medium">Scan QR Code</h3>
-              {qrCodeUrl && (
-                <div className="flex justify-center">
-                  <img
-                    src={qrCodeUrl}
-                    alt="QR Code"
-                    className="border rounded"
-                  />
-                </div>
-              )}
+                <Button
+                  onClick={setupEmailOTP}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  {loading ? "Setting up..." : "Set Up Email Verification"}
+                </Button>
+              </TabsContent>
+            </Tabs>
+          )}
 
-              <div className="space-y-2">
-                <Label>Or enter this secret key manually:</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={totpSecret}
-                    readOnly
-                    className="font-mono text-sm"
-                  />
-                  <Button variant="outline" size="sm" onClick={copySecret}>
-                    {secretCopied ? (
-                      <CheckCircle className="h-4 w-4" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
+          {step === "verify" && activeMethod === "totp" && (
+            <div className="space-y-6">
+              <div className="text-center space-y-4">
+                <h3 className="font-medium">Scan QR Code</h3>
+                {qrCodeUrl && (
+                  <div className="flex justify-center">
+                    <img
+                      src={qrCodeUrl}
+                      alt="QR Code"
+                      className="border rounded"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Or enter this secret key manually:</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={totpSecret}
+                      readOnly
+                      className="font-mono text-sm"
+                    />
+                    <Button variant="outline" size="sm" onClick={copySecret}>
+                      {secretCopied ? (
+                        <CheckCircle className="h-4 w-4" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
+
+              <div className="space-y-4">
+                <Label>
+                  Enter verification code from your authenticator app:
+                </Label>
+                <InputOTP
+                  value={verificationCode}
+                  onChange={setVerificationCode}
+                  maxLength={6}
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+
+                <Button
+                  onClick={verifyTOTP}
+                  disabled={loading || verificationCode.length !== 6}
+                  className="w-full"
+                >
+                  {loading ? "Verifying..." : "Verify & Enable"}
+                </Button>
+              </div>
             </div>
+          )}
 
+          {step === "verify" && activeMethod === "email" && (
             <div className="space-y-4">
-              <Label>
-                Enter verification code from your authenticator app:
-              </Label>
-              <InputOTP
-                value={verificationCode}
-                onChange={setVerificationCode}
-                maxLength={6}
-              >
-                <InputOTPGroup>
-                  <InputOTPSlot index={0} />
-                  <InputOTPSlot index={1} />
-                  <InputOTPSlot index={2} />
-                  <InputOTPSlot index={3} />
-                  <InputOTPSlot index={4} />
-                  <InputOTPSlot index={5} />
-                </InputOTPGroup>
-              </InputOTP>
+              <Alert>
+                <Mail className="h-4 w-4" />
+                <AlertDescription>
+                  We've sent a verification code to your email address. Enter it
+                  below to complete setup.
+                </AlertDescription>
+              </Alert>
 
-              <Button
-                onClick={verifyTOTP}
-                disabled={loading || verificationCode.length !== 6}
-                className="w-full"
-              >
-                {loading ? "Verifying..." : "Verify & Enable"}
+              <div className="space-y-4">
+                <Label>Enter verification code from email:</Label>
+                <InputOTP value={emailOTP} onChange={setEmailOTP} maxLength={6}>
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+
+                <Button
+                  onClick={verifyEmailOTP}
+                  disabled={loading || emailOTP.length !== 6}
+                  className="w-full"
+                >
+                  {loading ? "Verifying..." : "Verify & Enable"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isOptional && step === "setup" && (
+            <div className="flex justify-between pt-4 border-t">
+              <Button variant="outline" onClick={onSkip}>
+                Skip for Now
+              </Button>
+              <Button onClick={() => onComplete?.()}>
+                Continue Without MFA
               </Button>
             </div>
-          </div>
-        )}
+          )}
 
-        {step === "verify" && activeMethod === "email" && (
-          <div className="space-y-4">
-            <Alert>
-              <Mail className="h-4 w-4" />
-              <AlertDescription>
-                We've sent a verification code to your email address. Enter it
-                below to complete setup.
-              </AlertDescription>
-            </Alert>
-
-            <div className="space-y-4">
-              <Label>Enter verification code from email:</Label>
-              <InputOTP value={emailOTP} onChange={setEmailOTP} maxLength={6}>
-                <InputOTPGroup>
-                  <InputOTPSlot index={0} />
-                  <InputOTPSlot index={1} />
-                  <InputOTPSlot index={2} />
-                  <InputOTPSlot index={3} />
-                  <InputOTPSlot index={4} />
-                  <InputOTPSlot index={5} />
-                </InputOTPGroup>
-              </InputOTP>
-
-              <Button
-                onClick={verifyEmailOTP}
-                disabled={loading || emailOTP.length !== 6}
-                className="w-full"
-              >
-                {loading ? "Verifying..." : "Verify & Enable"}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {isOptional && step === "setup" && (
-          <div className="flex justify-between pt-4 border-t">
-            <Button variant="outline" onClick={onSkip}>
-              Skip for Now
+          {step === "verify" && (
+            <Button
+              variant="outline"
+              onClick={() => setStep("setup")}
+              className="w-full"
+            >
+              Back to Setup
             </Button>
-            <Button onClick={() => onComplete?.()}>Continue Without MFA</Button>
-          </div>
-        )}
-
-        {step === "verify" && (
-          <Button
-            variant="outline"
-            onClick={() => setStep("setup")}
-            className="w-full"
-          >
-            Back to Setup
-          </Button>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };

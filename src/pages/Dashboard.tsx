@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { MFASetup } from "@/components/auth/MFASetup";
 import AddCategoryForm from "@/components/categories/AddCategoryForm";
 import CategoryList from "@/components/categories/CategoryList";
 import DashboardHome from "@/components/dashboard/DashboardHome";
@@ -366,6 +367,16 @@ const Dashboard = () => {
                   >
                     Custom Fields
                   </button>
+                  <button
+                    className={`px-4 py-2 ${
+                      settingsSubView === "security"
+                        ? "border-b-2 border-[#FF6F00] text-[#FF6F00]"
+                        : "text-gray-500"
+                    }`}
+                    onClick={() => handleSettingsSubViewChange("security")}
+                  >
+                    Security
+                  </button>
                 </div>
 
                 <div className="grid gap-6">
@@ -374,6 +385,14 @@ const Dashboard = () => {
                   {settingsSubView === "plans" && <PlanManagement />}
 
                   {settingsSubView === "fields" && <CustomFieldsManager />}
+
+                  {settingsSubView === "security" && (
+                    <MFASetup
+                      isOptional={true}
+                      onComplete={() => {}}
+                      onSkip={() => {}}
+                    />
+                  )}
                 </div>
               </div>
             </ScrollArea>

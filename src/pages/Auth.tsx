@@ -1,4 +1,7 @@
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
+import { MFAOptionalSetup } from "@/components/auth/MFAOptionalSetup";
+import { MFASetup } from "@/components/auth/MFASetup";
+import { MFASimpleVerification } from "@/components/auth/MFASimpleVerification";
 import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { validatePassword } from "@/lib/passwordValidation";
 import InputValidator from "@/utils/inputValidator";
 import SecureLogger from "@/utils/logger";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const Auth = () => {
@@ -33,13 +36,25 @@ const Auth = () => {
     lastName: "",
   });
 
+  const [activeTab, setActiveTab] = useState("signin");
+  const [currentView, setCurrentView] = useState<
+    "auth" | "forgot" | "reset" | "mfa" | "mfa_optional"
+  >("auth");
+  const [mfaStep, setMfaStep] = useState<
+    "login" | "mfa_setup" | "mfa_verify" | "mfa_optional"
+  >("login");
+  const [authenticatedUser, setAuthenticatedUser] = useState<{
+    id: string;
+    email: string;
+  } | null>(null);
+
   // Get redirect path from URL if present, with fallback handling for Vercel
-  const getRedirectPath = () => {
+  const getRedirectPath = useCallback(() => {
     const searchParams = new URLSearchParams(location.search);
     const redirect = searchParams.get("redirect");
     // Use a relative path to ensure it works in all deployment environments
     return redirect ? decodeURIComponent(redirect) : "/dashboard";
-  };
+  }, [location.search]);
 
   // Parse URL params to determine initial tab and check for session expiry message
   useEffect(() => {
@@ -47,6 +62,7 @@ const Auth = () => {
     const tab = searchParams.get("tab");
     const mode = searchParams.get("mode");
     const expired = searchParams.get("expired");
+    const message = searchParams.get("message");
 
     if (mode === "reset") {
       setCurrentView("reset");
@@ -62,7 +78,23 @@ const Auth = () => {
         variant: "destructive",
       });
     }
-  }, [location, toast]);
+
+    // Handle messages from MFA setup
+    if (message === "mfa_setup_complete") {
+      toast({
+        title: "MFA Setup Complete",
+        description:
+          "Multi-factor authentication is now enabled. Please sign in again to verify.",
+      });
+    } else if (message === "mfa_required") {
+      toast({
+        title: "MFA Required",
+        description:
+          "Multi-factor authentication setup is mandatory for all accounts.",
+        variant: "destructive",
+      });
+    }
+  }, [location, toast, setActiveTab, setCurrentView]);
 
   // Check for existing session on component mount and redirect if already logged in
   useEffect(() => {
@@ -83,7 +115,7 @@ const Auth = () => {
     };
 
     checkSession();
-  }, [navigate, location.search, toast]);
+  }, [navigate, getRedirectPath, toast]);
 
   // Set up auth state change listener with improved error handling
   useEffect(() => {
@@ -95,14 +127,27 @@ const Auth = () => {
         hasSession: session ? "session exists" : "no session",
       });
 
-      if (event === "SIGNED_IN" && session) {
+      // Only auto-redirect on SIGNED_IN if we're not in the middle of MFA flow
+      if (
+        event === "SIGNED_IN" &&
+        session &&
+        currentView !== "mfa" &&
+        mfaStep === "login"
+      ) {
         try {
-          // Navigate to the redirect path if provided, otherwise to dashboard
-          const redirectPath = getRedirectPath();
-          SecureLogger.logAuthEvent("User signed in", { redirectPath });
+          // Check if user has MFA factors - if so, don't auto-redirect
+          const { data: factorData } = await supabase.auth.mfa.listFactors();
+          const hasVerifiedFactors = factorData?.all?.some(
+            (factor) => factor.status === "verified"
+          );
 
-          // Use replace to prevent back-button issues
-          navigate(redirectPath, { replace: true });
+          if (!hasVerifiedFactors) {
+            // No MFA factors, safe to redirect
+            const redirectPath = getRedirectPath();
+            SecureLogger.logAuthEvent("User signed in", { redirectPath });
+            navigate(redirectPath, { replace: true });
+          }
+          // If user has MFA factors, let the sign-in flow handle the MFA verification
         } catch (error) {
           SecureLogger.error("Error during redirect after sign in:", error);
           toast({
@@ -118,12 +163,7 @@ const Auth = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate, location.search, toast]);
-
-  const [activeTab, setActiveTab] = useState("signin");
-  const [currentView, setCurrentView] = useState<"auth" | "forgot" | "reset">(
-    "auth"
-  );
+  }, [navigate, getRedirectPath, toast, currentView, mfaStep]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,7 +270,7 @@ const Auth = () => {
     }
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: authData.email,
         password: authData.password,
       });
@@ -244,12 +284,80 @@ const Auth = () => {
             description:
               "Please check your email and click the verification link before signing in.",
           });
+          setIsLoading(false); // Reset loading state
           return;
         }
         throw error;
       }
 
-      // Navigate will happen automatically via the auth state change listener
+      // Valid credentials - now check MFA status
+      if (data.user) {
+        // Store the authenticated user
+        setAuthenticatedUser({
+          id: data.user.id,
+          email: data.user.email || authData.email,
+        });
+
+        // First, check if user has actual MFA factors set up in Supabase
+        const { data: factorData, error: factorError } =
+          await supabase.auth.mfa.listFactors();
+
+        if (!factorError && factorData?.all) {
+          const verifiedFactors = factorData.all.filter(
+            (factor) => factor.status === "verified"
+          );
+
+          if (verifiedFactors.length > 0) {
+            // User has active MFA in Supabase - redirect to separate MFA verification screen
+            setCurrentView("mfa");
+            toast({
+              title: "Authentication Required",
+              description: "Please verify your identity to continue.",
+            });
+            setIsLoading(false); // Reset loading state
+            return;
+          }
+        }
+
+        // No active MFA factors - check user preferences for first-time setup
+        const mfaPrompted =
+          localStorage.getItem("mfa_setup_prompted") === "true";
+        const mfaEnabled = localStorage.getItem("mfa_enabled") === "true";
+
+        if (!mfaPrompted) {
+          // First time user - show optional MFA setup
+          setMfaStep("mfa_optional");
+          toast({
+            title: "Welcome!",
+            description:
+              "Would you like to set up additional security for your account?",
+          });
+          setIsLoading(false); // Reset loading state
+          return;
+        } else if (mfaEnabled) {
+          // User has enabled MFA preference but no factors - show MFA setup
+          setMfaStep("mfa_setup");
+          toast({
+            title: "MFA Setup Required",
+            description: "Please complete your MFA setup to continue.",
+          });
+          setIsLoading(false); // Reset loading state
+          return;
+        } else {
+          // User has disabled MFA - direct login to dashboard
+          const redirectPath = getRedirectPath();
+          navigate(redirectPath, { replace: true });
+          setIsLoading(false); // Reset loading state
+          return;
+        }
+      }
+
+      // This should never be reached
+      toast({
+        title: "Authentication Error",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "An unexpected error occurred";
@@ -262,11 +370,76 @@ const Auth = () => {
     } finally {
       setIsLoading(false);
     }
-  }; // Handle different views
+  };
+
+  // Handle MFA optional setup completion
+  const handleMFAOptionalComplete = (enabled: boolean) => {
+    if (enabled) {
+      // User chose to enable MFA - redirect to setup
+      setMfaStep("mfa_setup");
+      toast({
+        title: "MFA Setup",
+        description: "Please set up your multi-factor authentication.",
+      });
+    } else {
+      // User chose to skip MFA - direct login to dashboard
+      const redirectPath = getRedirectPath();
+      navigate(redirectPath, { replace: true });
+    }
+  };
+
+  // Handle MFA setup completion
+  const handleMFASetupComplete = () => {
+    setMfaStep("mfa_verify");
+    toast({
+      title: "MFA Setup Complete",
+      description:
+        "Now please enter your authentication code to complete login.",
+    });
+  };
+
+  // Handle MFA verification completion
+  const handleMFAVerificationComplete = () => {
+    // MFA verification successful, navigate to dashboard
+    const redirectPath = getRedirectPath();
+    navigate(redirectPath, { replace: true });
+  };
+
+  // Handle back to login
+  const handleBackToLogin = async () => {
+    setMfaStep("login");
+    setAuthenticatedUser(null);
+    setIsLoading(false); // Reset loading state
+    // Sign out the user since they're going back to login
+    await supabase.auth.signOut();
+    setAuthData({ ...authData, password: "" }); // Clear password
+  };
+
+  // Handle different views
   if (currentView === "forgot") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
         <ForgotPasswordForm onBackToSignIn={() => setCurrentView("auth")} />
+      </div>
+    );
+  }
+
+  if (currentView === "mfa") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <MFASimpleVerification
+          onSuccess={() => {
+            // MFA verification successful, navigation will happen via auth state change
+            const redirectPath = getRedirectPath();
+            navigate(redirectPath, { replace: true });
+          }}
+          onBack={() => {
+            setCurrentView("auth");
+            setIsLoading(false); // Ensure loading state is reset when going back
+            setAuthenticatedUser(null); // Clear authenticated user
+            setMfaStep("login"); // Reset MFA step
+          }}
+        />
       </div>
     );
   }
@@ -296,46 +469,103 @@ const Auth = () => {
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
           <TabsContent value="signin">
-            <form onSubmit={handleSignIn}>
+            {mfaStep === "login" && (
+              <form onSubmit={handleSignIn}>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Email"
+                      value={authData.email}
+                      onChange={(e) =>
+                        setAuthData({ ...authData, email: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <PasswordInput
+                      id="password"
+                      placeholder="Password"
+                      value={authData.password}
+                      onChange={(e) =>
+                        setAuthData({ ...authData, password: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                </CardContent>
+                <CardFooter className="flex flex-col space-y-2">
+                  <Button className="w-full" type="submit" disabled={isLoading}>
+                    {isLoading ? "Signing in..." : "Sign In"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="text-sm text-muted-foreground"
+                    onClick={() => setCurrentView("forgot")}
+                  >
+                    Forgot your password?
+                  </Button>
+                </CardFooter>
+              </form>
+            )}
+
+            {mfaStep === "mfa_optional" && authenticatedUser && (
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Email"
-                    value={authData.email}
-                    onChange={(e) =>
-                      setAuthData({ ...authData, email: e.target.value })
-                    }
-                    required
-                  />
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Signed in as: <strong>{authenticatedUser.email}</strong>
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  <PasswordInput
-                    id="password"
-                    placeholder="Password"
-                    value={authData.password}
-                    onChange={(e) =>
-                      setAuthData({ ...authData, password: e.target.value })
-                    }
-                    required
-                  />
+                <MFAOptionalSetup
+                  onComplete={handleMFAOptionalComplete}
+                  onSkip={() => handleMFAOptionalComplete(false)}
+                />
+              </CardContent>
+            )}
+
+            {mfaStep === "mfa_setup" && authenticatedUser && (
+              <CardContent className="space-y-4">
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Signed in as: <strong>{authenticatedUser.email}</strong>
+                  </p>
+                  <p className="text-sm">
+                    Multi-factor authentication setup is required to complete
+                    login.
+                  </p>
+                </div>
+                <MFASetup
+                  isOptional={false}
+                  onComplete={handleMFASetupComplete}
+                  onSkip={() => {}} // No skip allowed when required
+                />
+                <div className="flex justify-center">
+                  <Button variant="outline" onClick={handleBackToLogin}>
+                    Back to Login
+                  </Button>
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-col space-y-2">
-                <Button className="w-full" type="submit" disabled={isLoading}>
-                  {isLoading ? "Signing in..." : "Sign In"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="link"
-                  className="text-sm text-muted-foreground"
-                  onClick={() => setCurrentView("forgot")}
-                >
-                  Forgot your password?
-                </Button>
-              </CardFooter>
-            </form>
+            )}
+
+            {mfaStep === "mfa_verify" && authenticatedUser && (
+              <CardContent className="space-y-4">
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Signed in as: <strong>{authenticatedUser.email}</strong>
+                  </p>
+                  <p className="text-sm">
+                    Enter your authentication code to complete login.
+                  </p>
+                </div>
+                <MFASimpleVerification
+                  onSuccess={handleMFAVerificationComplete}
+                  onBack={handleBackToLogin}
+                />
+              </CardContent>
+            )}
           </TabsContent>
           <TabsContent value="signup">
             <form onSubmit={handleSignUp}>

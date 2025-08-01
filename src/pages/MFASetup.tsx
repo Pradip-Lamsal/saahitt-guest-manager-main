@@ -1,24 +1,43 @@
 import { MFASetup } from "@/components/auth/MFASetup";
 import { useAuthSession } from "@/hooks/useAuthSession";
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const MFASetupPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { session, loading } = useAuthSession();
+  const [isMandatory, setIsMandatory] = useState(false);
+
+  useEffect(() => {
+    // Check if MFA setup is mandatory
+    const mandatoryParam = searchParams.get("mandatory");
+    setIsMandatory(mandatoryParam === "true");
+  }, [searchParams]);
 
   useEffect(() => {
     if (!loading && !session) {
+      // If no session and it's mandatory setup, redirect to auth
       navigate("/auth");
     }
   }, [session, loading, navigate]);
 
   const handleMFAComplete = () => {
-    navigate("/dashboard");
+    if (isMandatory) {
+      // For mandatory setup, redirect to auth to restart login process
+      navigate("/auth?tab=signin&message=mfa_setup_complete");
+    } else {
+      navigate("/dashboard");
+    }
   };
 
   const handleMFASkip = () => {
-    navigate("/dashboard");
+    if (isMandatory) {
+      // Can't skip if mandatory - show error or redirect to auth
+      navigate("/auth?tab=signin&message=mfa_required");
+    } else {
+      navigate("/dashboard");
+    }
   };
 
   if (loading) {
@@ -41,17 +60,27 @@ const MFASetupPage = () => {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Secure Your Account
+            {isMandatory ? "Security Setup Required" : "Secure Your Account"}
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Set up multi-factor authentication for enhanced security
+            {isMandatory
+              ? "Multi-factor authentication is mandatory for all accounts. Please set it up to continue."
+              : "Set up multi-factor authentication for enhanced security"}
           </p>
+          {isMandatory && (
+            <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
+              <p className="text-sm text-orange-800">
+                <strong>Required:</strong> You must complete MFA setup before
+                accessing your account.
+              </p>
+            </div>
+          )}
         </div>
 
         <MFASetup
           onComplete={handleMFAComplete}
           onSkip={handleMFASkip}
-          isOptional={true}
+          isOptional={!isMandatory}
         />
       </div>
     </div>

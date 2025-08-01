@@ -1,6 +1,8 @@
 import SecurityMonitor from "@/components/security/SecurityMonitor";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuthSession } from "@/hooks/useAuthSession";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import About from "./pages/About";
 import Auth from "./pages/Auth";
@@ -26,10 +28,54 @@ import Privacy from "./pages/Privacy";
 import RSVP from "./pages/RSVP";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, loading } = useAuthSession();
+  const { isAuthenticated, loading, session } = useAuthSession();
   const location = useLocation();
+  const [mfaLoading, setMfaLoading] = useState(true);
+  const [hasMFA, setHasMFA] = useState(false);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
 
-  if (loading) {
+  // Check if user has MFA enabled and set up when they're authenticated
+  useEffect(() => {
+    const checkMFAStatus = async () => {
+      if (isAuthenticated && session) {
+        try {
+          // Check if user has enabled MFA (from localStorage for now)
+          const mfaEnabledPref = localStorage.getItem("mfa_enabled") === "true";
+          setMfaEnabled(mfaEnabledPref);
+
+          if (mfaEnabledPref) {
+            // Only check for actual MFA factors if user has enabled MFA
+            const { data: factorData, error: factorError } =
+              await supabase.auth.mfa.listFactors();
+
+            if (!factorError && factorData?.all) {
+              const verifiedFactors = factorData.all.filter(
+                (factor) => factor.status === "verified"
+              );
+              setHasMFA(verifiedFactors.length > 0);
+            } else {
+              setHasMFA(false);
+            }
+          } else {
+            // User hasn't enabled MFA, so they don't need it
+            setHasMFA(true); // Allow access
+          }
+        } catch (error) {
+          console.error("Error checking MFA status:", error);
+          setHasMFA(!mfaEnabled); // If error and MFA not enabled, allow access
+        }
+      }
+      setMfaLoading(false);
+    };
+
+    if (isAuthenticated) {
+      checkMFAStatus();
+    } else {
+      setMfaLoading(false);
+    }
+  }, [isAuthenticated, session, mfaEnabled]);
+
+  if (loading || mfaLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -38,14 +84,29 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   const currentPath = location.pathname + location.search;
-  return isAuthenticated ? (
-    <>{children}</>
-  ) : (
-    <Navigate
-      to={`/auth?redirect=${encodeURIComponent(currentPath)}`}
-      replace
-    />
-  );
+
+  // If not authenticated at all, redirect to auth
+  if (!isAuthenticated) {
+    return (
+      <Navigate
+        to={`/auth?redirect=${encodeURIComponent(currentPath)}`}
+        replace
+      />
+    );
+  }
+
+  // If authenticated but accessing MFA setup page, allow it
+  if (location.pathname === "/mfa-setup") {
+    return <>{children}</>;
+  }
+
+  // If user has enabled MFA but hasn't set it up yet, force MFA setup
+  if (mfaEnabled && !hasMFA) {
+    return <Navigate to="/mfa-setup?mandatory=true" replace />;
+  }
+
+  // If authenticated and either doesn't need MFA or has MFA properly set up, allow access
+  return <>{children}</>;
 };
 
 const App = () => {

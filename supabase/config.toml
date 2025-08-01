@@ -1,6 +1,14 @@
 
 project_id = "wifcukhtssicphdfrtex"
 
+[auth]
+enable_signup = true
+enable_manual_linking = false
+
+[auth.mfa]
+# Enable Multi-Factor Authentication support
+max_enrolled_factors = 10
+
 [functions.send-invite]
 verify_jwt = true
 
