@@ -1,0 +1,8 @@
+
+project_id = "wifcukhtssicphdfrtex"
+
+[functions.send-invite]
+verify_jwt = true
+
+[functions.rsvp]
+verify_jwt = false

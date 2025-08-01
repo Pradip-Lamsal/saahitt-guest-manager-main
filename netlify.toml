@@ -1,0 +1,13 @@
+
+# This file tells Netlify how to handle the SPA routing
+
+[build]
+  # Directory to publish (relative to root of your repo)
+  publish = "dist"
+
+# Handle SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true
