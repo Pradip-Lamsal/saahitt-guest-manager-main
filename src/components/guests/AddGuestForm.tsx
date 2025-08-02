@@ -1,11 +1,7 @@
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { NewGuest } from "@/types/guest";
-import { CustomField } from "@/types/custom-field";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -13,37 +9,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
-import { useGuestData } from "@/hooks/useGuestData";
-import { useQuery } from "@tanstack/react-query";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle, Plus, Trash2 } from "lucide-react";
-import { useCategories } from "@/hooks/useCategories";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useToast } from "@/components/ui/use-toast";
+import { useCategories } from "@/hooks/useCategories";
+import { useGuestData } from "@/hooks/useGuestData";
+import { supabase } from "@/integrations/supabase/client";
+import { CustomField } from "@/types/custom-field";
+import { NewGuest } from "@/types/guest";
 import { mapStatusToRsvp } from "@/utils/rsvpMapper";
+import { useQuery } from "@tanstack/react-query";
+import { HelpCircle, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 interface AddGuestFormProps {
   onSuccess: () => void;
 }
 
 const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
-  const [guests, setGuests] = useState<Partial<NewGuest>[]>([{
-    first_name: "",
-    last_name: "",
-    email: "",
-    phone: "",
-    category: "Others",
-    priority: "Medium",
-    status: "Pending",
-    notes: "",
-    custom_values: {},
-  }]);
-  
+  const [guests, setGuests] = useState<Partial<NewGuest>[]>([
+    {
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      category: "Others",
+      priority: "Medium",
+      status: "Pending",
+      notes: "",
+      custom_values: {},
+    },
+  ]);
+
   const { toast } = useToast();
   const { addGuests } = useGuestData();
   const { categories } = useCategories();
-  
+
   const { data: customFields = [] } = useQuery({
     queryKey: ["customFields"],
     queryFn: async () => {
@@ -80,14 +87,20 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
     setGuests(updatedGuests);
   };
 
-  const handleCustomValueChange = (index: number, field: string, value: string) => {
+  const handleCustomValueChange = (
+    index: number,
+    field: string,
+    value: string
+  ) => {
     const updatedGuests = [...guests];
     const guestToUpdate = updatedGuests[index];
-    
-    const customValues = typeof guestToUpdate.custom_values === 'object' && guestToUpdate.custom_values !== null
-      ? guestToUpdate.custom_values
-      : {};
-    
+
+    const customValues =
+      typeof guestToUpdate.custom_values === "object" &&
+      guestToUpdate.custom_values !== null
+        ? guestToUpdate.custom_values
+        : {};
+
     updatedGuests[index] = {
       ...guestToUpdate,
       custom_values: {
@@ -95,27 +108,14 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
         [field]: value,
       },
     };
-    
+
     setGuests(updatedGuests);
   };
 
   const addGuestField = () => {
-    setGuests([...guests, {
-      first_name: "",
-      last_name: "",
-      email: "",
-      phone: "",
-      category: "Others",
-      priority: "Medium",
-      status: "Pending",
-      notes: "",
-      custom_values: {},
-    }]);
-  };
-
-  const removeGuestField = (index: number) => {
-    if (guests.length === 1) {
-      setGuests([{
+    setGuests([
+      ...guests,
+      {
         first_name: "",
         last_name: "",
         email: "",
@@ -125,10 +125,28 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
         status: "Pending",
         notes: "",
         custom_values: {},
-      }]);
+      },
+    ]);
+  };
+
+  const removeGuestField = (index: number) => {
+    if (guests.length === 1) {
+      setGuests([
+        {
+          first_name: "",
+          last_name: "",
+          email: "",
+          phone: "",
+          category: "Others",
+          priority: "Medium",
+          status: "Pending",
+          notes: "",
+          custom_values: {},
+        },
+      ]);
       return;
     }
-    
+
     const updatedGuests = guests.filter((_, i) => i !== index);
     setGuests(updatedGuests);
   };
@@ -136,10 +154,12 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error("No authenticated user");
 
-      const invalidGuests = guests.filter(g => !g.first_name);
+      const invalidGuests = guests.filter((g) => !g.first_name);
       if (invalidGuests.length > 0) {
         toast({
           variant: "destructive",
@@ -149,7 +169,7 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
         return;
       }
 
-      const newGuests: NewGuest[] = guests.map(guest => ({
+      const newGuests: NewGuest[] = guests.map((guest) => ({
         user_id: session.user.id,
         first_name: guest.first_name || "",
         last_name: guest.last_name || "",
@@ -157,25 +177,42 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
         phone: guest.phone || "",
         category: guest.category || "Others",
         priority: (guest.priority || "Medium") as "High" | "Medium" | "Low",
-        status: (guest.status || "Pending") as "Confirmed" | "Maybe" | "Unavailable" | "Pending",
+        status: (guest.status || "Pending") as
+          | "Confirmed"
+          | "Maybe"
+          | "Unavailable"
+          | "Pending",
         notes: guest.notes || "",
         custom_values: guest.custom_values || {},
-        rsvp_status: mapStatusToRsvp((guest.status || "Pending") as "Confirmed" | "Maybe" | "Unavailable" | "Pending"),
+        rsvp_status: mapStatusToRsvp(
+          (guest.status || "Pending") as
+            | "Confirmed"
+            | "Maybe"
+            | "Unavailable"
+            | "Pending"
+        ),
       }));
 
       addGuests.mutate(newGuests, {
         onSuccess: onSuccess,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message,
+        description:
+          error instanceof Error ? error.message : "An error occurred",
       });
     }
   };
 
-  const FieldLabel = ({ label, tooltip }: { label: string, tooltip: string }) => (
+  const FieldLabel = ({
+    label,
+    tooltip,
+  }: {
+    label: string;
+    tooltip: string;
+  }) => (
     <div className="flex items-center space-x-1">
       <span>{label}</span>
       <TooltipProvider>
@@ -194,14 +231,14 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
   return (
     <div className="p-4">
       <h2 className="text-xl font-bold mb-4">Add New Guests</h2>
-      
+
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm text-gray-500">
-          {guests.length} guest{guests.length !== 1 ? 's' : ''} to add
+          {guests.length} guest{guests.length !== 1 ? "s" : ""} to add
         </span>
-        
-        <Button 
-          variant="outline" 
+
+        <Button
+          variant="outline"
           size="sm"
           onClick={addGuestField}
           className="flex items-center"
@@ -210,7 +247,7 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
           Add Another Guest
         </Button>
       </div>
-      
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {guests.map((guest, index) => (
           <div key={index} className="border rounded-md p-4 relative">
@@ -228,7 +265,7 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
                 </Button>
               </div>
             )}
-                
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor={`first_name_${index}`}>
@@ -240,7 +277,9 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
                 <Input
                   id={`first_name_${index}`}
                   value={guest.first_name || ""}
-                  onChange={(e) => handleInputChange(index, "first_name", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange(index, "first_name", e.target.value)
+                  }
                   required
                 />
               </div>
@@ -254,7 +293,9 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
                 <Input
                   id={`last_name_${index}`}
                   value={guest.last_name || ""}
-                  onChange={(e) => handleInputChange(index, "last_name", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange(index, "last_name", e.target.value)
+                  }
                 />
               </div>
             </div>
@@ -271,20 +312,21 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
                   id={`email_${index}`}
                   type="email"
                   value={guest.email || ""}
-                  onChange={(e) => handleInputChange(index, "email", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange(index, "email", e.target.value)
+                  }
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor={`phone_${index}`}>
-                  <FieldLabel
-                    label="Phone"
-                    tooltip="Contact phone number"
-                  />
+                  <FieldLabel label="Phone" tooltip="Contact phone number" />
                 </Label>
                 <Input
                   id={`phone_${index}`}
                   value={guest.phone || ""}
-                  onChange={(e) => handleInputChange(index, "phone", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange(index, "phone", e.target.value)
+                  }
                 />
               </div>
             </div>
@@ -299,7 +341,9 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
                 </Label>
                 <Select
                   value={guest.category || "Others"}
-                  onValueChange={(value) => handleInputChange(index, "category", value)}
+                  onValueChange={(value) =>
+                    handleInputChange(index, "category", value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
@@ -357,10 +401,16 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Confirmed">Confirmed (Attending)</SelectItem>
+                    <SelectItem value="Confirmed">
+                      Confirmed (Attending)
+                    </SelectItem>
                     <SelectItem value="Maybe">Maybe (Undecided)</SelectItem>
-                    <SelectItem value="Unavailable">Unavailable (Not Attending)</SelectItem>
-                    <SelectItem value="Pending">Pending (No Response)</SelectItem>
+                    <SelectItem value="Unavailable">
+                      Unavailable (Not Attending)
+                    </SelectItem>
+                    <SelectItem value="Pending">
+                      Pending (No Response)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -377,7 +427,9 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
                 id={`notes_${index}`}
                 placeholder="Add any notes, special requirements, dietary restrictions, etc."
                 value={guest.notes || ""}
-                onChange={(e) => handleInputChange(index, "notes", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange(index, "notes", e.target.value)
+                }
                 rows={2}
               />
             </div>
@@ -397,8 +449,16 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
                       {field.field_type === "text" && (
                         <Input
                           id={`custom-${field.id}-${index}`}
-                          value={guest.custom_values?.[field.name] || ""}
-                          onChange={(e) => handleCustomValueChange(index, field.name, e.target.value)}
+                          value={String(
+                            guest.custom_values?.[field.name] ?? ""
+                          )}
+                          onChange={(e) =>
+                            handleCustomValueChange(
+                              index,
+                              field.name,
+                              e.target.value
+                            )
+                          }
                           placeholder={`Enter ${field.name}`}
                         />
                       )}
@@ -406,8 +466,16 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
                         <Input
                           id={`custom-${field.id}-${index}`}
                           type="number"
-                          value={guest.custom_values?.[field.name] || ""}
-                          onChange={(e) => handleCustomValueChange(index, field.name, e.target.value)}
+                          value={String(
+                            guest.custom_values?.[field.name] ?? ""
+                          )}
+                          onChange={(e) =>
+                            handleCustomValueChange(
+                              index,
+                              field.name,
+                              e.target.value
+                            )
+                          }
                           placeholder={`Enter ${field.name}`}
                         />
                       )}
@@ -415,14 +483,26 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
                         <Input
                           id={`custom-${field.id}-${index}`}
                           type="date"
-                          value={guest.custom_values?.[field.name] || ""}
-                          onChange={(e) => handleCustomValueChange(index, field.name, e.target.value)}
+                          value={String(
+                            guest.custom_values?.[field.name] ?? ""
+                          )}
+                          onChange={(e) =>
+                            handleCustomValueChange(
+                              index,
+                              field.name,
+                              e.target.value
+                            )
+                          }
                         />
                       )}
                       {field.field_type === "select" && (
                         <Select
-                          value={guest.custom_values?.[field.name] || ""}
-                          onValueChange={(value) => handleCustomValueChange(index, field.name, value)}
+                          value={String(
+                            guest.custom_values?.[field.name] ?? ""
+                          )}
+                          onValueChange={(value) =>
+                            handleCustomValueChange(index, field.name, value)
+                          }
                         >
                           <SelectTrigger>
                             <SelectValue placeholder={`Select ${field.name}`} />
@@ -441,22 +521,22 @@ const AddGuestForm = ({ onSuccess }: AddGuestFormProps) => {
                 </div>
               </div>
             )}
-            
+
             {index < guests.length - 1 && <Separator className="mt-4" />}
           </div>
         ))}
 
         <div className="flex justify-between pt-2">
-          <Button 
-            type="button" 
-            variant="outline" 
+          <Button
+            type="button"
+            variant="outline"
             onClick={addGuestField}
             className="flex items-center"
           >
             <Plus className="h-4 w-4 mr-1" />
             Add Another Guest
           </Button>
-          
+
           <Button type="submit" className="px-6">
             {guests.length > 1 ? `Add ${guests.length} Guests` : "Add Guest"}
           </Button>
