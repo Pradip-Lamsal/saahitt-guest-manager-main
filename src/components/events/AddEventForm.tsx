@@ -1,13 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { NewEvent } from "@/types/event";
 import { useEventData } from "@/hooks/useEventData";
 import { supabase } from "@/integrations/supabase/client";
+import { NewEvent } from "@/types/event";
+import { useState } from "react";
 
 interface AddEventFormProps {
   onSuccess: () => void;
@@ -26,7 +27,9 @@ const AddEventForm = ({ onSuccess }: AddEventFormProps) => {
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         toast({
           variant: "destructive",
@@ -45,12 +48,12 @@ const AddEventForm = ({ onSuccess }: AddEventFormProps) => {
       };
 
       await addEvent.mutateAsync(newEvent);
-      
+
       // Reset form
       setName("");
       setDescription("");
       setDate("");
-      
+
       // Close dialog and refresh events list
       onSuccess();
     } catch (error: any) {
@@ -58,7 +61,8 @@ const AddEventForm = ({ onSuccess }: AddEventFormProps) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add event: " + (error.message || "Unknown error"),
+        description:
+          "Failed to add event: " + (error.message || "Unknown error"),
       });
     } finally {
       setLoading(false);

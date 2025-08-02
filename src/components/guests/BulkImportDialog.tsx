@@ -1,26 +1,30 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { generateGuestTemplate, parseGuestFile } from "@/utils/excelUtils";
-import { useGuestData } from "@/hooks/useGuestData";
-import { useCustomFields } from "@/hooks/useCustomFields";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { FileSpreadsheet, Download, Upload, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useCustomFields } from "@/hooks/useCustomFields";
+import { useGuestData } from "@/hooks/useGuestData";
+import { generateGuestTemplate, parseGuestFile } from "@/utils/excelUtils";
+import { AlertCircle, Download, Upload } from "lucide-react";
+import { useState } from "react";
 
 interface BulkImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const BulkImportDialog: React.FC<BulkImportDialogProps> = ({ open, onOpenChange }) => {
+const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
+  open,
+  onOpenChange,
+}) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const { addGuests } = useGuestData();
@@ -86,21 +90,23 @@ const BulkImportDialog: React.FC<BulkImportDialogProps> = ({ open, onOpenChange 
       <DialogHeader>
         <DialogTitle>Import Guests from Excel/CSV</DialogTitle>
       </DialogHeader>
-      
+
       <div className="space-y-4 py-4">
         {customFields.length > 0 && (
           <Alert className="bg-blue-50 border-blue-200">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Your account has {customFields.length} custom {customFields.length === 1 ? 'field' : 'fields'}.
-              The template includes these fields. Make sure to fill them correctly for your guests.
+              Your account has {customFields.length} custom{" "}
+              {customFields.length === 1 ? "field" : "fields"}. The template
+              includes these fields. Make sure to fill them correctly for your
+              guests.
             </AlertDescription>
           </Alert>
         )}
-        
+
         <div>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={handleDownloadTemplate}
             className="w-full"
           >
@@ -108,7 +114,7 @@ const BulkImportDialog: React.FC<BulkImportDialogProps> = ({ open, onOpenChange 
             Download Template
           </Button>
         </div>
-        
+
         <div className="space-y-2">
           <Label htmlFor="file">Upload Excel/CSV File</Label>
           <Input
@@ -121,9 +127,9 @@ const BulkImportDialog: React.FC<BulkImportDialogProps> = ({ open, onOpenChange 
             {file ? `Selected file: ${file.name}` : "No file selected"}
           </p>
         </div>
-        
-        <Button 
-          onClick={handleUpload} 
+
+        <Button
+          onClick={handleUpload}
           disabled={!file || uploading}
           className="w-full"
         >

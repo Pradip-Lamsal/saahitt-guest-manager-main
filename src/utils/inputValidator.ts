@@ -1,8 +1,3 @@
-/**
- * Input Validation & Sanitization Utility
- * Provides comprehensive input validation and XSS protection
- */
-
 // Define validation rules interface
 interface ValidationRule {
   required?: boolean;

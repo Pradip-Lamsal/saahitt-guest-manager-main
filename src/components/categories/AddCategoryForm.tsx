@@ -1,12 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { NewCategory } from "@/types/category";
+import { useState } from "react";
 
 interface AddCategoryFormProps {
   onSuccess: () => void;
@@ -23,7 +24,9 @@ const AddCategoryForm = ({ onSuccess }: AddCategoryFormProps) => {
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
       const newCategory: NewCategory = {
@@ -32,9 +35,7 @@ const AddCategoryForm = ({ onSuccess }: AddCategoryFormProps) => {
         user_id: user.id,
       };
 
-      const { error } = await supabase
-        .from("categories")
-        .insert(newCategory);
+      const { error } = await supabase.from("categories").insert(newCategory);
 
       if (error) throw error;
 
@@ -42,7 +43,7 @@ const AddCategoryForm = ({ onSuccess }: AddCategoryFormProps) => {
         title: "Success",
         description: "Category added successfully",
       });
-      
+
       onSuccess();
       setName("");
       setDescription("");

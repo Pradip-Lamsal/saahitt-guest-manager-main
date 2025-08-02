@@ -19,6 +19,25 @@ dist-ssr
 .env.test.local
 .env.production.local
 
+# SSL Certificates
+.certificates/
+*.pem
+*.key
+
+# Documentation
+ms_word.md
+
+# Security and Penetration Testing Files
+setup-https.sh
+scripts/setup-https.sh
+security/install-pentest-tools.sh
+security/run-security-tests.sh
+*.md
+security/*.md
+security_test_report_*.txt
+pentest_results/
+zap_report.html
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

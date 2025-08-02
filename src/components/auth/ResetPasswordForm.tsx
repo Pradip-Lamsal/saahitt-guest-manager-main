@@ -1,12 +1,18 @@
-import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PasswordInput } from "@/components/ui/password-input";
 import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { validatePassword } from "@/lib/passwordValidation";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export function ResetPasswordForm() {
@@ -21,7 +27,7 @@ export function ResetPasswordForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!passwordStrength.isValid) {
       toast({
         variant: "destructive",
@@ -53,8 +59,9 @@ export function ResetPasswordForm() {
         title: "Password updated",
         description: "Your password has been successfully updated.",
       });
-      
+
       navigate("/dashboard");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -102,9 +109,9 @@ export function ResetPasswordForm() {
             )}
           </div>
 
-          <Button 
-            type="submit" 
-            className="w-full" 
+          <Button
+            type="submit"
+            className="w-full"
             disabled={isLoading || !passwordStrength.isValid || !passwordsMatch}
           >
             {isLoading ? "Updating..." : "Update password"}

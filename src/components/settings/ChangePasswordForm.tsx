@@ -1,13 +1,20 @@
-import React, { useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PasswordInput } from "@/components/ui/password-input";
 import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { validatePassword } from "@/lib/passwordValidation";
 import { Key } from "lucide-react";
+import React, { useState } from "react";
 
 export function ChangePasswordForm() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -21,7 +28,7 @@ export function ChangePasswordForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!passwordStrength.isValid) {
       toast({
         variant: "destructive",
@@ -44,7 +51,9 @@ export function ChangePasswordForm() {
 
     try {
       // First verify the current password by attempting to re-authenticate
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user?.email) {
         throw new Error("User not found");
       }
@@ -60,13 +69,14 @@ export function ChangePasswordForm() {
       }
 
       // Check password reuse using our edge function
-      const { data: reuseCheck, error: reuseError } = await supabase.functions.invoke('password-management', {
-        body: { 
-          action: 'check_reuse', 
-          password: newPassword,
-          user_id: user.id 
-        }
-      });
+      const { data: reuseCheck, error: reuseError } =
+        await supabase.functions.invoke("password-management", {
+          body: {
+            action: "check_reuse",
+            password: newPassword,
+            user_id: user.id,
+          },
+        });
 
       if (reuseError) {
         console.error("Error checking password reuse:", reuseError);
@@ -88,12 +98,12 @@ export function ChangePasswordForm() {
       if (updateError) throw updateError;
 
       // Store password hash in history using edge function
-      await supabase.functions.invoke('password-management', {
-        body: { 
-          action: 'store_password_history', 
+      await supabase.functions.invoke("password-management", {
+        body: {
+          action: "store_password_history",
           password: newPassword,
-          user_id: user.id 
-        }
+          user_id: user.id,
+        },
       });
 
       toast({
@@ -105,7 +115,6 @@ export function ChangePasswordForm() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -168,9 +177,14 @@ export function ChangePasswordForm() {
           </div>
 
           <div className="flex justify-end">
-            <Button 
-              type="submit" 
-              disabled={isLoading || !passwordStrength.isValid || !passwordsMatch || !currentPassword}
+            <Button
+              type="submit"
+              disabled={
+                isLoading ||
+                !passwordStrength.isValid ||
+                !passwordsMatch ||
+                !currentPassword
+              }
             >
               {isLoading ? "Updating..." : "Update password"}
             </Button>

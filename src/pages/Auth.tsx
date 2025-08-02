@@ -66,6 +66,16 @@ const Auth = () => {
 
     if (mode === "reset") {
       setCurrentView("reset");
+    } else if (mode === "confirmed") {
+      // Handle email confirmation success
+      toast({
+        title: "Email Verified!",
+        description:
+          "Your email has been verified successfully. You can now sign in to your account.",
+      });
+      setActiveTab("signin");
+      // Clear the URL parameters
+      navigate("/auth", { replace: true });
     } else if (tab) {
       setActiveTab(tab === "signup" ? "signup" : "signin");
     }
@@ -94,7 +104,7 @@ const Auth = () => {
         variant: "destructive",
       });
     }
-  }, [location, toast, setActiveTab, setCurrentView]);
+  }, [location, toast, setActiveTab, setCurrentView, navigate]);
 
   // Check for existing session on component mount and redirect if already logged in
   useEffect(() => {
@@ -210,7 +220,7 @@ const Auth = () => {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: validation.sanitizedData.email,
         password: authData.password, // Don't sanitize password
         options: {
@@ -218,16 +228,37 @@ const Auth = () => {
             first_name: validation.sanitizedData.first_name,
             last_name: validation.sanitizedData.last_name,
           },
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}/auth?mode=confirmed`,
         },
       });
 
       if (error) throw error;
 
-      toast({
-        title: "Success!",
-        description: "Please check your email to verify your account.",
-      });
+      // Check if email confirmation is required
+      if (data.user && !data.session) {
+        // Email confirmation required
+        toast({
+          title: "Check Your Email",
+          description:
+            "We've sent you a confirmation link. Please check your email and click the link to verify your account before signing in.",
+        });
+        setActiveTab("signin"); // Switch to sign-in tab
+        // Clear the form
+        setAuthData({
+          email: "",
+          password: "",
+          firstName: "",
+          lastName: "",
+        });
+      } else if (data.session) {
+        // Immediate sign-in (email confirmation disabled)
+        toast({
+          title: "Account Created!",
+          description: "Your account has been created successfully.",
+        });
+        const redirectPath = getRedirectPath();
+        navigate(redirectPath, { replace: true });
+      }
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "An unexpected error occurred";
@@ -494,6 +525,7 @@ const Auth = () => {
                       }
                       required
                     />
+                    <PasswordStrengthIndicator password={authData.password} />
                   </div>
                 </CardContent>
                 <CardFooter className="flex flex-col space-y-2">

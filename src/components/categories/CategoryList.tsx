@@ -1,8 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { Category } from "@/types/category";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -11,11 +11,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Category } from "@/types/category";
 import { Edit, Save, Trash, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const CategoryList = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -94,10 +95,7 @@ const CategoryList = () => {
     if (!confirm("Are you sure you want to delete this category?")) return;
 
     try {
-      const { error } = await supabase
-        .from("categories")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("categories").delete().eq("id", id);
 
       if (error) throw error;
 
@@ -160,7 +158,10 @@ const CategoryList = () => {
                       <Textarea
                         value={editForm.description}
                         onChange={(e) =>
-                          setEditForm({ ...editForm, description: e.target.value })
+                          setEditForm({
+                            ...editForm,
+                            description: e.target.value,
+                          })
                         }
                       />
                     ) : (

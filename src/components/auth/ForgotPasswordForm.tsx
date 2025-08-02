@@ -1,17 +1,26 @@
-import React, { useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft } from "lucide-react";
+import React, { useState } from "react";
 
 interface ForgotPasswordFormProps {
   onBackToSignIn: () => void;
 }
 
-export function ForgotPasswordForm({ onBackToSignIn }: ForgotPasswordFormProps) {
+export function ForgotPasswordForm({
+  onBackToSignIn,
+}: ForgotPasswordFormProps) {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -58,9 +67,9 @@ export function ForgotPasswordForm({ onBackToSignIn }: ForgotPasswordFormProps) 
             <p className="text-sm text-muted-foreground text-center">
               Didn't receive the email? Check your spam folder or try again.
             </p>
-            <Button 
-              variant="outline" 
-              className="w-full" 
+            <Button
+              variant="outline"
+              className="w-full"
               onClick={onBackToSignIn}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -93,16 +102,16 @@ export function ForgotPasswordForm({ onBackToSignIn }: ForgotPasswordFormProps) 
               required
             />
           </div>
-          
+
           <div className="space-y-2">
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Sending..." : "Send reset link"}
             </Button>
-            
-            <Button 
+
+            <Button
               type="button"
-              variant="ghost" 
-              className="w-full" 
+              variant="ghost"
+              className="w-full"
               onClick={onBackToSignIn}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />

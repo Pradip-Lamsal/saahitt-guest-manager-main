@@ -1,31 +1,34 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Event } from "@/types/event";
-import { useToast } from "@/components/ui/use-toast";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function useEventData() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { 
-    data: events = [], 
+  const {
+    data: events = [],
     isLoading,
     error,
-    refetch
+    refetch,
   } = useQuery({
-    queryKey: ['events'],
+    queryKey: ["events"],
     queryFn: async () => {
       // Check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error("Authentication required");
       }
-      
+
       const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .order('date', { ascending: true });
+        .from("events")
+        .select("*")
+        .order("date", { ascending: true });
 
       if (error) {
         console.error("Error fetching events:", error);
@@ -36,24 +39,28 @@ export function useEventData() {
         });
         throw error;
       }
-      
+
       return data || [];
     },
   });
 
   const addEvent = useMutation({
-    mutationFn: async (newEvent: Omit<Event, 'id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (
+      newEvent: Omit<Event, "id" | "created_at" | "updated_at">
+    ) => {
       // Verify user is authenticated
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error("Authentication required");
       }
-      
+
       const { data, error } = await supabase
-        .from('events')
+        .from("events")
         .insert({
           ...newEvent,
-          user_id: user.id
+          user_id: user.id,
         })
         .select();
 
@@ -64,7 +71,7 @@ export function useEventData() {
       return data?.[0];
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
       toast({
         title: "Success",
         description: "Event added successfully",
@@ -75,7 +82,8 @@ export function useEventData() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add event: " + (error.message || "Unknown error"),
+        description:
+          "Failed to add event: " + (error.message || "Unknown error"),
       });
     },
   });
@@ -83,13 +91,13 @@ export function useEventData() {
   const updateEvent = useMutation({
     mutationFn: async (event: Event) => {
       const { error } = await supabase
-        .from('events')
+        .from("events")
         .update({
           name: event.name,
           description: event.description,
           date: event.date,
         })
-        .eq('id', event.id);
+        .eq("id", event.id);
 
       if (error) {
         console.error("Error updating event:", error);
@@ -98,7 +106,7 @@ export function useEventData() {
       return event;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
       toast({
         title: "Success",
         description: "Event updated successfully",
@@ -109,17 +117,15 @@ export function useEventData() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update event: " + (error.message || "Unknown error"),
+        description:
+          "Failed to update event: " + (error.message || "Unknown error"),
       });
     },
   });
 
   const deleteEvent = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('events')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from("events").delete().eq("id", id);
 
       if (error) {
         console.error("Error deleting event:", error);
@@ -128,7 +134,7 @@ export function useEventData() {
       return id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ["events"] });
       toast({
         title: "Success",
         description: "Event deleted successfully",
@@ -139,7 +145,8 @@ export function useEventData() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to delete event: " + (error.message || "Unknown error"),
+        description:
+          "Failed to delete event: " + (error.message || "Unknown error"),
       });
     },
   });

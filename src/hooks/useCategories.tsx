@@ -1,31 +1,33 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Category } from "@/types/category";
-import { useToast } from "@/components/ui/use-toast";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const useCategories = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { 
-    data: categories = [], 
+  const {
+    data: categories = [],
     isLoading,
     error,
-    refetch
+    refetch,
   } = useQuery({
-    queryKey: ['categories'],
+    queryKey: ["categories"],
     queryFn: async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session) throw new Error("User not authenticated");
 
         const { data, error } = await supabase
-          .from('categories')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .order('name', { ascending: true });
+          .from("categories")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .order("name", { ascending: true });
 
         if (error) throw error;
         return data as Category[];
@@ -33,27 +35,32 @@ export const useCategories = () => {
         console.error("Error fetching categories:", error);
         throw error;
       }
-    }
+    },
   });
 
   const addCategory = useMutation({
-    mutationFn: async (newCategory: Omit<Category, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-      const { data: { session } } = await supabase.auth.getSession();
+    mutationFn: async (
+      newCategory: Omit<
+        Category,
+        "id" | "user_id" | "created_at" | "updated_at"
+      >
+    ) => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error("User not authenticated");
 
       const { data, error } = await supabase
-        .from('categories')
-        .insert([
-          { ...newCategory, user_id: session.user.id }
-        ])
-        .select('*')
+        .from("categories")
+        .insert([{ ...newCategory, user_id: session.user.id }])
+        .select("*")
         .single();
 
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
         title: "Success",
         description: "Category added successfully",
@@ -71,18 +78,18 @@ export const useCategories = () => {
   const updateCategory = useMutation({
     mutationFn: async (category: Category) => {
       const { error } = await supabase
-        .from('categories')
+        .from("categories")
         .update({
           name: category.name,
-          description: category.description
+          description: category.description,
         })
-        .eq('id', category.id);
+        .eq("id", category.id);
 
       if (error) throw error;
       return category;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
         title: "Success",
         description: "Category updated successfully",
@@ -99,16 +106,13 @@ export const useCategories = () => {
 
   const deleteCategory = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from("categories").delete().eq("id", id);
 
       if (error) throw error;
       return id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
         title: "Success",
         description: "Category deleted successfully",
@@ -129,14 +133,14 @@ export const useCategories = () => {
       Family: "bg-purple-100 text-purple-800 border-purple-200",
       Friends: "bg-blue-100 text-blue-800 border-blue-200",
       Work: "bg-orange-100 text-orange-800 border-orange-200",
-      Others: "bg-gray-100 text-gray-800 border-gray-200"
+      Others: "bg-gray-100 text-gray-800 border-gray-200",
     };
 
     // Check if it's one of the default categories
     if (categoryName in defaultColors) {
       return defaultColors[categoryName as keyof typeof defaultColors];
     }
-    
+
     // For custom categories, return a consistent color based on the name
     // This ensures the same category always gets the same color
     const customColors = [
@@ -147,13 +151,15 @@ export const useCategories = () => {
       "bg-amber-100 text-amber-800 border-amber-200",
       "bg-cyan-100 text-cyan-800 border-cyan-200",
       "bg-violet-100 text-violet-800 border-violet-200",
-      "bg-rose-100 text-rose-800 border-rose-200"
+      "bg-rose-100 text-rose-800 border-rose-200",
     ];
-    
+
     // Use the sum of character codes to create a deterministic index
-    const charSum = categoryName.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const charSum = categoryName
+      .split("")
+      .reduce((sum, char) => sum + char.charCodeAt(0), 0);
     const colorIndex = charSum % customColors.length;
-    
+
     return customColors[colorIndex];
   };
 
@@ -165,6 +171,6 @@ export const useCategories = () => {
     addCategory,
     updateCategory,
     deleteCategory,
-    getCategoryColor
+    getCategoryColor,
   };
 };
