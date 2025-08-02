@@ -1,4 +1,3 @@
-import SecurityMonitor from "@/components/security/SecurityMonitor";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { supabase } from "@/integrations/supabase/client";
@@ -175,9 +174,6 @@ const App = () => {
         />
         <Route path="*" element={<NotFound />} />
       </Routes>
-
-      {/* Security Monitor - shown globally but only renders when needed */}
-      <SecurityMonitor />
     </TooltipProvider>
   );
 };
