@@ -32,7 +32,7 @@ const AccountSettings = () => {
 
   useEffect(() => {
     getProfile();
-  }, []);
+  }, []); //eslint error raixa
 
   const getProfile = async () => {
     try {
